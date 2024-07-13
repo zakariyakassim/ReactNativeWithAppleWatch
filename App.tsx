@@ -1,118 +1,115 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
-
-import React from 'react';
-import type {PropsWithChildren} from 'react';
+/* eslint-disable react/react-in-jsx-scope */
+import {useEffect, useState} from 'react';
 import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
+  Button,
+  NativeEventEmitter,
+  NativeModules,
   StyleSheet,
   Text,
-  useColorScheme,
   View,
 } from 'react-native';
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+const {WatchConnectivityModule, WatchModule} = NativeModules;
+const watchSessionManagerEmitter = new NativeEventEmitter(
+  WatchConnectivityModule,
+);
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
+export default function App() {
+  const [heartRate, setHeartRate] = useState(0);
+  const [distance, setDistance] = useState(0);
+  const [activeEnergyBurned, setActiveEnergyBurned] = useState(0);
+  const [basalEnergyBurned, setBasalEnergyBurned] = useState(0);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [stopped, setStopped] = useState(false);
+  const [workoutType, setWorkoutType] = useState('');
 
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+  useEffect(() => {
+    const subscription = watchSessionManagerEmitter.addListener(
+      'HealthDataReceived',
+      message => {
+        console.log('Received Health Data:', message);
+        setHeartRate(message.heartRate);
+        setDistance(message.distance);
+        setActiveEnergyBurned(message.activeEnergyBurned);
+        setBasalEnergyBurned(message.basalEnergyBurned);
+        setElapsedTime(message.elapsedTime);
+        setPaused(message.paused);
+        setStopped(message.stopped);
+        setWorkoutType(message.workoutType);
+      },
+    );
+
+    WatchConnectivityModule.activateWatchSession();
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  const handleStartRunningWorkout = () => {
+    WatchModule.activateWatchApp();
+    // WatchConnectivityModule.sendMessage({
+    //   command: 'startWorkout',
+    //   workoutType: 'running',
+    // });
+  };
+
+  const handleStartCyclingWorkout = () => {
+    WatchModule.activateWatchApp();
+    WatchConnectivityModule.sendMessage({
+      command: 'startWorkout',
+      workoutType: 'cycling',
+    });
+  };
+
+  const handleStopWorkout = () => {
+    WatchModule.activateWatchApp();
+  };
+
   return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
+    <View style={styles.container}>
+      <View style={styles.values}>
+        <Button title="Init Watch" onPress={handleStopWorkout} />
+        <Button
+          title="Start Running Workout"
+          onPress={handleStartRunningWorkout}
+        />
+        <Button
+          title="Start Cycling Workout"
+          onPress={handleStartCyclingWorkout}
+        />
+
+        <Text style={styles.text}>Live Heart Rate: {heartRate} bpm</Text>
+        <Text style={styles.text}>Distance: {distance} km</Text>
+        <Text style={styles.text}>
+          Active Energy Burned: {activeEnergyBurned} kcal
+        </Text>
+        <Text style={styles.text}>
+          Basal Energy Burned: {basalEnergyBurned} kcal
+        </Text>
+        <Text style={styles.text}>Elapsed Time: {elapsedTime} sec</Text>
+        <Text style={styles.text}>Paused: {paused ? 'Yes' : 'No'}</Text>
+        <Text style={styles.text}>Stopped: {stopped ? 'Yes' : 'No'}</Text>
+        <Text style={styles.text}>Workout Type: {workoutType}</Text>
+      </View>
     </View>
   );
 }
 
-function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
-  };
-
-  return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
-      />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
-
 const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
+  text: {
+    color: 'white',
+    fontSize: 20,
+    marginVertical: 5,
   },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
+  values: {
+    alignItems: 'center',
   },
 });
-
-export default App;
